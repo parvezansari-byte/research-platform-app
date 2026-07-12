@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no"/>
+  <title>My Research Platform</title>
+
+  <!-- PWA manifest (Android / Chrome) -->
+  <link rel="manifest" href="manifest.json"/>
+  <meta name="theme-color" content="#0A2E24"/>
+
+  <!-- iOS: Safari IGNORES the manifest, so these tags are required -->
+  <meta name="mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <meta name="apple-mobile-web-app-title" content="Research"/>
+  <link rel="apple-touch-icon" href="icon-192.png"/>
+  <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png"/>
+
+  <style>
+    :root { --vault:#0A2E24; --gold:#C9A227; --mint:#DCEFE6; }
+    * { box-sizing:border-box; margin:0; padding:0; }
+    html, body {
+      height:100%; width:100%; overflow:hidden;
+      background:var(--vault);
+      font-family:system-ui,-apple-system,'Segoe UI',sans-serif;
+      /* respect the iPhone notch */
+      padding-top:env(safe-area-inset-top);
+      padding-bottom:env(safe-area-inset-bottom);
+    }
+    /* Wrapper crops the iframe so Streamlit's "Built with Streamlit" footer
+       bar sits below the visible area. We can't style inside the iframe
+       (cross-origin), so we push it out of view instead. */
+    #frame-wrap {
+      position:absolute; inset:0; overflow:hidden;
+    }
+    iframe {
+      width:100%;
+      height:calc(100% + 56px);   /* extra height = footer pushed off-screen */
+      border:0; display:block;
+      background:var(--vault);
+    }
+
+    /* splash while the Streamlit app boots (it can be slow to cold-start) */
+    #splash {
+      position:fixed; inset:0; z-index:10;
+      background:radial-gradient(900px 600px at 50% 20%, #1C5943 0%, #0A2E24 60%);
+      display:flex; flex-direction:column; align-items:center; justify-content:center;
+      gap:18px; transition:opacity .45s ease;
+    }
+    #splash.hide { opacity:0; pointer-events:none; }
+    #splash img { width:88px; height:88px; border-radius:20px; }
+    .sp-name {
+      color:var(--gold); font-size:20px; font-weight:600; letter-spacing:.2px;
+    }
+    .sp-tag { color:var(--mint); font-size:12px; opacity:.65; }
+    .bar {
+      width:140px; height:3px; border-radius:2px;
+      background:rgba(220,239,230,.15); overflow:hidden; margin-top:6px;
+    }
+    .bar i {
+      display:block; width:40%; height:100%; background:var(--gold);
+      animation:slide 1.1s ease-in-out infinite;
+    }
+    @keyframes slide {
+      0%{transform:translateX(-100%)} 100%{transform:translateX(350%)}
+    }
+
+    /* offline banner — Streamlit needs a live connection */
+    #offline {
+      position:fixed; top:0; left:0; right:0; z-index:20;
+      background:#b45309; color:#fff; text-align:center;
+      font-size:13px; padding:9px 12px; display:none;
+      padding-top:calc(9px + env(safe-area-inset-top));
+    }
+    #offline.show { display:block; }
+  </style>
+</head>
+<body>
+
+  <div id="offline">⚠️ You're offline — this app needs an internet connection.</div>
+
+  <div id="splash">
+    <img src="icon-512.png" alt=""/>
+    <div class="sp-name">My Research Platform</div>
+    <div class="sp-tag">Loading your research…</div>
+    <div class="bar"><i></i></div>
+  </div>
+
+  <!-- ⚠️ CHANGE THIS to your own Streamlit URL if it differs -->
+  <div id="frame-wrap">
+    <iframe
+      id="app"
+      src="https://myinvestmentplatform.streamlit.app/?embed=true&embed_options=hide_loading_screen&embed_options=hide_footer&embed_options=hide_toolbar"
+      allow="clipboard-read; clipboard-write; fullscreen"
+      referrerpolicy="origin">
+    </iframe>
+  </div>
+
+  <script>
+    // Hide the splash once the app frame has loaded (with a safety timeout,
+    // since Streamlit Cloud cold starts can take a while).
+    const splash = document.getElementById('splash');
+    const frame  = document.getElementById('app');
+    const done   = () => splash.classList.add('hide');
+    frame.addEventListener('load', () => setTimeout(done, 900));
+    setTimeout(done, 12000);   // never leave the user stuck on the splash
+
+    // Offline indicator
+    const off = document.getElementById('offline');
+    const sync = () => off.classList.toggle('show', !navigator.onLine);
+    window.addEventListener('online', sync);
+    window.addEventListener('offline', sync);
+    sync();
+
+    // Service worker — required for Chrome to offer "Install app".
+    // NOTE: this site lives in a GitHub Pages SUBFOLDER (/research-platform-app/),
+    // so the scope must be explicit — a bare './sw.js' can resolve wrongly.
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        const base = location.pathname.replace(/[^/]*$/, ''); // e.g. /research-platform-app/
+        navigator.serviceWorker.register(base + 'sw.js', { scope: base })
+          .then((reg) => console.log('[PWA] service worker registered, scope:', reg.scope))
+          .catch((err) => console.error('[PWA] service worker FAILED:', err));
+      });
+    }
+  </script>
+</body>
+</html>
